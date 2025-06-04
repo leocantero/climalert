@@ -1,5 +1,6 @@
 package ar.utn.ba.ddsi.mailing.models.entities;
 
+import ar.utn.ba.ddsi.mailing.models.entities.alerta.Alerta;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.LocalDateTime;

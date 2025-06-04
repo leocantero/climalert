@@ -1,5 +1,6 @@
 package ar.utn.ba.ddsi.mailing.models.entities;
 
+import ar.utn.ba.ddsi.mailing.models.entities.alerta.Alerta;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -19,9 +20,5 @@ public class Email {
         this.asunto = asunto;
         this.contenido = contenido;
         this.enviado = false;
-    }
-
-    public void enviar() {
-        //TODO: Implementación pendiente. Podríamos usar adapters
     }
 } 

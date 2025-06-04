@@ -1,5 +1,7 @@
 package ar.utn.ba.ddsi.mailing.services.impl;
 
+import ar.utn.ba.ddsi.mailing.models.dto.input.EmailInputDTO;
+import ar.utn.ba.ddsi.mailing.models.dto.mapper.EmailMapper;
 import ar.utn.ba.ddsi.mailing.models.entities.Email;
 import ar.utn.ba.ddsi.mailing.models.repositories.IEmailRepository;
 import ar.utn.ba.ddsi.mailing.services.IEmailService;
@@ -12,14 +14,22 @@ import java.util.List;
 public class EmailService implements IEmailService {
     private static final Logger logger = LoggerFactory.getLogger(EmailService.class);
     private final IEmailRepository emailRepository;
+    private final EmailMapper emailMapper = new EmailMapper();
 
     public EmailService(IEmailRepository emailRepository) {
         this.emailRepository = emailRepository;
     }
 
     @Override
-    public Email crearEmail(Email email) {
-        return emailRepository.save(email);
+    public Email crearEmail(EmailInputDTO emailInputDTO) {
+        Email email = emailMapper.toEntity(emailInputDTO);
+        guardarEmail(email);
+        return email;
+    }
+
+    @Override
+    public void guardarEmail(Email email) {
+        emailRepository.save(email);
     }
 
     @Override
@@ -34,10 +44,15 @@ public class EmailService implements IEmailService {
     public void procesarPendientes() {
         List<Email> pendientes = emailRepository.findByEnviado(false);
         for (Email email : pendientes) {
-            email.enviar();
-            email.setEnviado(true);
-            emailRepository.save(email);
+            enviarEmail(email);
         }
+    }
+
+    @Override
+    public void enviarEmail(Email email) {
+        // TODO: implementar lógica de envío de email
+        email.setEnviado(true);
+        emailRepository.save(email);
     }
 
     @Override

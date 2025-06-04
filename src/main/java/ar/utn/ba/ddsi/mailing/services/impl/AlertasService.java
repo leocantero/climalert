@@ -2,6 +2,8 @@ package ar.utn.ba.ddsi.mailing.services.impl;
 
 import ar.utn.ba.ddsi.mailing.models.entities.Clima;
 import ar.utn.ba.ddsi.mailing.models.entities.Email;
+import ar.utn.ba.ddsi.mailing.models.entities.alerta.Alerta;
+import ar.utn.ba.ddsi.mailing.models.repositories.IAlertaRepository;
 import ar.utn.ba.ddsi.mailing.models.repositories.IClimaRepository;
 import ar.utn.ba.ddsi.mailing.services.IAlertasService;
 import org.slf4j.Logger;
@@ -15,10 +17,9 @@ import java.util.List;
 @Service
 public class AlertasService implements IAlertasService {
     private static final Logger logger = LoggerFactory.getLogger(AlertasService.class);
-    private static final double TEMPERATURA_ALERTA = 35.0;
-    private static final int HUMEDAD_ALERTA = 60;
 
     private final IClimaRepository climaRepository;
+    private final IAlertaRepository alertasRepository;
     private final EmailService emailService;
     private final String remitente;
     private final List<String> destinatarios;
@@ -26,11 +27,13 @@ public class AlertasService implements IAlertasService {
     public AlertasService(
             IClimaRepository climaRepository, 
             EmailService emailService,
+            IAlertaRepository alertasRepository,
             @Value("${email.alertas.remitente}") String remitente,
             @Value("${email.alertas.destinatarios}") String destinatarios) {
         this.climaRepository = climaRepository;
         this.emailService = emailService;
         this.remitente = remitente;
+        this.alertasRepository = alertasRepository;
         this.destinatarios = Arrays.asList(destinatarios.split(","));
     }
 
@@ -43,7 +46,7 @@ public class AlertasService implements IAlertasService {
             })
             .flatMap(climas -> {
                 climas.stream()
-                    .filter(this::cumpleCondicionesAlerta)
+                    .filter(clima -> !alertasRepository.findAlertasByCumpleCondicionesDeAlerta(clima).isEmpty())
                     .forEach(this::generarYEnviarEmail);
                 
                 // Marcar todos como procesados
@@ -61,34 +64,38 @@ public class AlertasService implements IAlertasService {
             .then();
     }
 
-    private boolean cumpleCondicionesAlerta(Clima clima) {
-        //TODO: podríamos refactorizar el diseño para que no sea un simple método, pues puede ser más complejo
-        return clima.getTemperaturaCelsius() > TEMPERATURA_ALERTA && 
-               clima.getHumedad() > HUMEDAD_ALERTA;
+    private List<Clima> obtenerClimasNoProcesados() {
+        return climaRepository.findByProcesado(false);
     }
 
     private void generarYEnviarEmail(Clima clima) {
-        String asunto = "Alerta de Clima - Condiciones Extremas";
-        String mensaje = String.format(
-            "ALERTA: Condiciones climáticas extremas detectadas en %s\n\n" +
-            "Temperatura: %.1f°C\n" +
-            "Humedad: %d%%\n" +
-            "Condición: %s\n" +
-            "Velocidad del viento: %.1f km/h\n\n" +
-            "Se recomienda tomar precauciones.",
-            clima.getCiudad(),
-            clima.getTemperaturaCelsius(),
-            clima.getHumedad(),
-            clima.getCondicion(),
-            clima.getVelocidadVientoKmh()
-        );
+        List<Alerta> alertas = alertasRepository.findAlertasByCumpleCondicionesDeAlerta(clima);
+        for (Alerta alerta : alertas) {
+            String asunto = "Alerta de Clima - Condiciones Extremas";
+                    String mensaje = String.format(
+                        "ALERTA: %s detectada en %s\n\n" +
+                        "Temperatura: %.1f°C\n" +
+                        "Humedad: %d%%\n" +
+                        "Condición: %s\n" +
+                        "Velocidad del viento: %.1f km/h\n\n" +
+                        "Se recomienda tomar precauciones.",
+                        alerta.getDescripcion(),
+                        clima.getCiudad(),
+                        clima.getTemperaturaCelsius(),
+                        clima.getHumedad(),
+                        clima.getCondicion(),
+                        clima.getVelocidadVientoKmh()
+                    );
 
-        for (String destinatario : destinatarios) {
-            Email email = new Email(destinatario, remitente, asunto, mensaje);
-            emailService.crearEmail(email);
+                    for (String destinatario : destinatarios) {
+                        Email email = new Email(destinatario, remitente, asunto, mensaje);
+                        emailService.guardarEmail(email);
+                        emailService.enviarEmail(email);
+                    }
+
+                    logger.info("Email de alerta generado para {} - Enviado a {} destinatarios",
+                        clima.getCiudad(), destinatarios.size());
+                }
         }
-        
-        logger.info("Email de alerta generado para {} - Enviado a {} destinatarios", 
-            clima.getCiudad(), destinatarios.size());
-    }
+
 } 
